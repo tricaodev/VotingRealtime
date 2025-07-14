@@ -1,4 +1,4 @@
-from confluent_kafka import Consumer, KafkaError, SerializingProducer
+from confluent_kafka import Consumer, SerializingProducer
 from main import DATABASE_CONFIG, delivery_report
 import psycopg2
 import json
