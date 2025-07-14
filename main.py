@@ -64,53 +64,53 @@ def create_table(conn, curs):
     conn.commit()
 
 def generate_candidate_data(candidate_number):
-    result = requests.get(USER_API + "&gender=" + ("male" if candidate_number % 2 == 0 else "female"))
+    while True:
+        try:
+            result = requests.get(USER_API + "&gender=" + ("male" if candidate_number % 2 == 0 else "female"))
+            data = result.json()["results"][0]
 
-    if result.status_code == 200:
-        data = result.json()["results"][0]
+            return {
+                "id": data["login"]["uuid"],
+                "name": f"{data["name"]["first"]} {data["name"]["last"]}",
+                "party_affiliation": PARTIES[candidate_number],
+                "biography": "A brief biography of the candidate",
+                "campaign_platform": "Key campaign promises and or platform",
+                "photo_url": data["picture"]["large"]
+            }
 
-        return {
-            "id": data["login"]["uuid"],
-            "name": f"{data["name"]["first"]} {data["name"]["last"]}",
-            "party_affiliation": PARTIES[candidate_number],
-            "biography": "A brief biography of the candidate",
-            "campaign_platform": "Key campaign promises and or platform",
-            "photo_url": data["picture"]["large"]
-        }
-
-    else:
-        print(f"Fetching data failed with status code: {result.status_code}")
-        return {}
+        except Exception as e:
+            print(f"An error occurred when fetching data from randomuser API: {e}")
+            print("Retrying...")
 
 def generate_voter_data():
-    result = requests.get(USER_API)
+    while True:
+        try:
+            result = requests.get(USER_API)
+            data = result.json()["results"][0]
 
-    if result.status_code == 200:
-        data = result.json()["results"][0]
+            return {
+                "id": data["login"]["uuid"],
+                "name": f"{data["name"]["first"]} {data["name"]["last"]}",
+                "date_of_birth": data["dob"]["date"],
+                "gender": data["gender"],
+                "nationality": data["nat"],
+                "registration_number": data["login"]["username"],
+                "address": {
+                    "street": f"{data["location"]["street"]["number"]} {data["location"]["street"]["name"]}",
+                    "city": data["location"]["city"],
+                    "state": data["location"]["state"],
+                    "country": data["location"]["country"],
+                    "postcode": data["location"]["postcode"]
+                },
+                "email": data["email"],
+                "phone_number": data["phone"],
+                "picture": data["picture"]["large"],
+                "registered_age": data["registered"]["age"]
+            }
 
-        return {
-            "id": data["login"]["uuid"],
-            "name": f"{data["name"]["first"]} {data["name"]["last"]}",
-            "date_of_birth": data["dob"]["date"],
-            "gender": data["gender"],
-            "nationality": data["nat"],
-            "registration_number": data["login"]["username"],
-            "address": {
-                "street": f"{data["location"]["street"]["number"]} {data["location"]["street"]["name"]}",
-                "city": data["location"]["city"],
-                "state": data["location"]["state"],
-                "country": data["location"]["country"],
-                "postcode": data["location"]["postcode"]
-            },
-            "email": data["email"],
-            "phone_number": data["phone"],
-            "picture": data["picture"]["large"],
-            "registered_age": data["registered"]["age"]
-        }
-
-    else:
-        print(f"Fetching data failed with status code: {result.status_code}")
-        return {}
+        except Exception as e:
+            print(f"An error occurred when fetching data from randomuser API: {e}")
+            print("Retrying...")
 
 def delivery_report(err, msg):
     if err is not None:
@@ -131,34 +131,47 @@ if __name__ == "__main__":
 
         if len(candidates) == 0:
             for i in range(len(PARTIES)):
-                candidate = generate_candidate_data(i)
-                print(candidate)
+                while True:
+                    try:
+                        candidate = generate_candidate_data(i)
+                        print(candidate)
 
-                curs.execute("""
-                    INSERT INTO candidates
-                    VALUES (%s, %s, %s, %s, %s, %s)
-                """, (candidate["id"], candidate["name"], candidate["party_affiliation"],
-                      candidate["biography"], candidate["campaign_platform"], candidate["photo_url"]))
-                conn.commit()
+                        curs.execute("""
+                            INSERT INTO candidates
+                            VALUES (%s, %s, %s, %s, %s, %s)
+                        """, (candidate["id"], candidate["name"], candidate["party_affiliation"],
+                              candidate["biography"], candidate["campaign_platform"], candidate["photo_url"]))
+                        conn.commit()
+                        break
+
+                    except:
+                        continue
 
         for i in range(3000):
-            voter = generate_voter_data()
+            while True:
+                try:
+                    voter = generate_voter_data()
 
-            curs.execute("""
-                INSERT INTO voters
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """, (voter["id"], voter["name"], voter["date_of_birth"], voter["gender"], voter["nationality"],
-                  voter["registration_number"], voter["address"]["street"], voter["address"]["city"], voter["address"]["state"], voter["address"]["country"],
-                  voter["address"]["postcode"], voter["email"], voter["phone_number"], voter["picture"], voter["registered_age"]))
-            conn.commit()
+                    curs.execute("""
+                        INSERT INTO voters
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """, (voter["id"], voter["name"], voter["date_of_birth"], voter["gender"], voter["nationality"],
+                          voter["registration_number"], voter["address"]["street"], voter["address"]["city"], voter["address"]["state"], voter["address"]["country"],
+                          voter["address"]["postcode"], voter["email"], voter["phone_number"], voter["picture"], voter["registered_age"]))
+                    conn.commit()
 
-            # produce message to kafka topic
-            producer.produce(topic="voters_topic", key=voter["id"], value=json.dumps(voter), on_delivery=delivery_report)
-            producer.flush()
+                    # produce message to kafka topic
+                    producer.produce(topic="voters_topic", key=voter["id"], value=json.dumps(voter), on_delivery=delivery_report)
+                    producer.poll(0)
+                    break
+
+                except:
+                    continue
+
+        producer.flush()
 
         curs.close()
         conn.close()
-
 
     except Exception as e:
         print(f"An error occurred: {e}")
