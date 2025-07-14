@@ -50,9 +50,7 @@ if __name__ == "__main__":
                 voter = json.loads(msg.value().decode('utf-8'))
                 chosen_candidate = random.choice(candidates)
 
-                vote = {
-                    "voter_id": voter["id"],
-                    "candidate_id": chosen_candidate["id"],
+                vote = voter | chosen_candidate | {
                     "voting_time": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
                     "vote": 1
                 }

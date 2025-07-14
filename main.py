@@ -3,6 +3,7 @@ import requests
 import random
 import json
 from confluent_kafka import SerializingProducer
+from datetime import datetime
 
 DATABASE_CONFIG = {
     "host": "localhost",
@@ -20,8 +21,8 @@ def create_table(conn, curs):
     # Create candidates table
     curs.execute("""
         CREATE TABLE IF NOT EXISTS candidates (
-            id VARCHAR(255) PRIMARY KEY,
-            name VARCHAR(255),
+            candidate_id VARCHAR(255) PRIMARY KEY,
+            candidate_name VARCHAR(255),
             party_affiliation VARCHAR(255),
             biography TEXT,
             campaign_platform TEXT,
@@ -32,8 +33,8 @@ def create_table(conn, curs):
     # Create voters table
     curs.execute("""
         CREATE TABLE IF NOT EXISTS voters (
-            id VARCHAR(255) PRIMARY KEY,
-            name VARCHAR(255),
+            voter_id VARCHAR(255) PRIMARY KEY,
+            voter_name VARCHAR(255),
             date_of_birth DATE,
             gender VARCHAR(255),
             nationality VARCHAR(255),
@@ -70,8 +71,8 @@ def generate_candidate_data(candidate_number):
             data = result.json()["results"][0]
 
             return {
-                "id": data["login"]["uuid"],
-                "name": f"{data["name"]["first"]} {data["name"]["last"]}",
+                "candidate_id": data["login"]["uuid"],
+                "candidate_name": f"{data["name"]["first"]} {data["name"]["last"]}",
                 "party_affiliation": PARTIES[candidate_number],
                 "biography": "A brief biography of the candidate",
                 "campaign_platform": "Key campaign promises and or platform",
@@ -89,9 +90,9 @@ def generate_voter_data():
             data = result.json()["results"][0]
 
             return {
-                "id": data["login"]["uuid"],
-                "name": f"{data["name"]["first"]} {data["name"]["last"]}",
-                "date_of_birth": data["dob"]["date"],
+                "voter_id": data["login"]["uuid"],
+                "voter_name": f"{data["name"]["first"]} {data["name"]["last"]}",
+                "date_of_birth": datetime.strptime(data["dob"]["date"], "%Y-%m-%dT%H:%M:%S.%fZ").strftime("%Y-%m-%d")  ,
                 "gender": data["gender"],
                 "nationality": data["nat"],
                 "registration_number": data["login"]["username"],
@@ -139,7 +140,7 @@ if __name__ == "__main__":
                         curs.execute("""
                             INSERT INTO candidates
                             VALUES (%s, %s, %s, %s, %s, %s)
-                        """, (candidate["id"], candidate["name"], candidate["party_affiliation"],
+                        """, (candidate["candidate_id"], candidate["candidate_name"], candidate["party_affiliation"],
                               candidate["biography"], candidate["campaign_platform"], candidate["photo_url"]))
                         conn.commit()
                         break
@@ -155,13 +156,13 @@ if __name__ == "__main__":
                     curs.execute("""
                         INSERT INTO voters
                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    """, (voter["id"], voter["name"], voter["date_of_birth"], voter["gender"], voter["nationality"],
+                    """, (voter["voter_id"], voter["voter_name"], voter["date_of_birth"], voter["gender"], voter["nationality"],
                           voter["registration_number"], voter["address"]["street"], voter["address"]["city"], voter["address"]["state"], voter["address"]["country"],
                           voter["address"]["postcode"], voter["email"], voter["phone_number"], voter["picture"], voter["registered_age"]))
                     conn.commit()
 
                     # produce message to kafka topic
-                    producer.produce(topic="voters_topic", key=voter["id"], value=json.dumps(voter), on_delivery=delivery_report)
+                    producer.produce(topic="voters_topic", key=voter["voter_id"], value=json.dumps(voter), on_delivery=delivery_report)
                     producer.poll(0)
                     break
 
