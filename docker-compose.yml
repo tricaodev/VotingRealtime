@@ -60,6 +60,7 @@ services:
       SPARK_MASTER_HOST: spark-master
     volumes:
       - ./jobs:/opt/bitnami/spark/jobs
+      - ./checkpoint:/opt/bitnami/spark/checkpoint
     networks:
       - voting_network
 
