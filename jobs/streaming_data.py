@@ -9,6 +9,8 @@ if __name__ == "__main__":
                 .config("spark.jars.packages", "org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.6") \
                 .getOrCreate()
 
+    spark.sparkContext.setLogLevel("WARN")
+
     votes_schema = StructType([
         StructField("voter_id", StringType(), False),
         StructField("voter_name", StringType(), True),
