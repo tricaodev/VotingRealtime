@@ -1,4 +1,5 @@
 .idea/
 .venv/
+checkpoint/
 checkpoint/turnout_per_location/
 checkpoint/votes_per_candidate/
