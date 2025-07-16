@@ -72,7 +72,7 @@ def generate_candidate_data(candidate_number):
 
             return {
                 "candidate_id": data["login"]["uuid"],
-                "candidate_name": f"{data["name"]["first"]} {data["name"]["last"]}",
+                "candidate_name": f'{data["name"]["first"]} {data["name"]["last"]}',
                 "party_affiliation": PARTIES[candidate_number],
                 "biography": "A brief biography of the candidate",
                 "campaign_platform": "Key campaign promises and or platform",
@@ -91,13 +91,13 @@ def generate_voter_data():
 
             return {
                 "voter_id": data["login"]["uuid"],
-                "voter_name": f"{data["name"]["first"]} {data["name"]["last"]}",
+                "voter_name": f'{data["name"]["first"]} {data["name"]["last"]}',
                 "date_of_birth": datetime.strptime(data["dob"]["date"], "%Y-%m-%dT%H:%M:%S.%fZ").strftime("%Y-%m-%d")  ,
                 "gender": data["gender"],
                 "nationality": data["nat"],
                 "registration_number": data["login"]["username"],
                 "address": {
-                    "street": f"{data["location"]["street"]["number"]} {data["location"]["street"]["name"]}",
+                    "street": f'{data["location"]["street"]["number"]} {data["location"]["street"]["name"]}',
                     "city": data["location"]["city"],
                     "state": data["location"]["state"],
                     "country": data["location"]["country"],
