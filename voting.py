@@ -1,4 +1,4 @@
-from confluent_kafka import Consumer, SerializingProducer
+from confluent_kafka import Consumer, SerializingProducer, KafkaError
 from main import DATABASE_CONFIG, delivery_report
 import psycopg2
 import json
@@ -16,7 +16,8 @@ if __name__ == "__main__":
             "bootstrap.servers": "localhost:9092",
             "group.id": "voting_group",
             "auto.offset.reset": "earliest",
-            "enable.auto.commit": True
+            "enable.auto.commit": True,
+            "enable.partition.eof": True
         })
         producer = SerializingProducer({"bootstrap.servers": "localhost:9092"})
         conn = psycopg2.connect(**DATABASE_CONFIG)
@@ -39,10 +40,13 @@ if __name__ == "__main__":
             msg = consumer.poll(1)
 
             if msg is None:
-                producer.flush()
                 continue
 
             elif msg.error():
+                if msg.error().code() == KafkaError._PARTITION_EOF:
+                    producer.flush()
+                    continue
+
                 print(f"An error occurred in kafka: {msg.error()}")
                 break
 
