@@ -1,11 +1,14 @@
+import numpy as np
 import pandas as pd
 import psycopg2
 import streamlit as st
 import json
+from pandas import DataFrame
 from streamlit_autorefresh import st_autorefresh
 from datetime import datetime
 from confluent_kafka import Consumer, TopicPartition
 from main import DATABASE_CONFIG
+import matplotlib.pyplot as plt
 
 conn = psycopg2.connect(**DATABASE_CONFIG)
 curs = conn.cursor()
@@ -19,8 +22,7 @@ consumer = Consumer({
 })
 
 def last_refresh_time():
-    last_refresh = st.empty()
-    last_refresh.text(f'Last refresh at: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
+    st.text(f'Last refresh at: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}')
     st.markdown("""---""")
 
 @st.cache_data(ttl=10)
@@ -48,9 +50,9 @@ def total_metric(voter_count, candidate_count):
 
     st.markdown("""---""")
 
-def show_leading_candidate():
+def leading_candidate(data: DataFrame):
     st.header("Leading Candidate")
-    winner = leading_candidate()
+    winner = data.iloc[data["total_votes"].idxmax()]
 
     col1, col2 = st.columns(2)
     with col1:
@@ -62,19 +64,6 @@ def show_leading_candidate():
         st.subheader(f'Total Votes: {winner["total_votes"]}')
 
     st.markdown("""---""")
-
-def leading_candidate():
-    fetch_data_from_kafka("votes_per_candidate")
-
-    df = pd.read_csv('./data/votes_per_candidate.csv', header=None, names=[
-        "candidate_id", "candidate_name", "party_affiliation", "photo_url", "total_votes"
-    ])
-    df = df.iloc[df.groupby("candidate_id")["total_votes"].idxmax()]
-    df.reset_index(drop=True, inplace=True)
-
-    result = df.iloc[df["total_votes"].idxmax()]
-
-    return result
 
 def fetch_data_from_kafka(topic_name):
     data = []
@@ -102,12 +91,84 @@ def fetch_data_from_kafka(topic_name):
     df = pd.DataFrame(data)
     df.to_csv(f'./data/{topic_name}.csv', index=False, header=False, mode='a')
 
+def voting_statistics(data: DataFrame):
+    data = data[["candidate_id", "candidate_name", "party_affiliation", "total_votes"]]
+    st.header("Voting Statistics")
+    col1, col2 = st.columns(2)
+
+    labels = list(data["candidate_name"])
+    values = list(data["total_votes"])
+
+    # Display bar chart
+    with col1:
+        colors = plt.cm.viridis(np.linspace(0, 1, data.shape[0]))
+
+        fig, ax = plt.subplots()
+        ax.bar(labels, values, color=colors)
+        ax.set_title("Vote Counts Per Candidate")
+        ax.set_xlabel("Candidate")
+        ax.set_ylabel("Total Votes")
+        ax.tick_params('x', rotation=90)
+
+        st.pyplot(fig)
+
+
+    # Display pie chart
+    with col2:
+        fig, ax = plt.subplots()
+
+        ax.pie(values, labels=labels, autopct='%.2f%%', startangle=90)
+        ax.set_title("Candidates Votes")
+        ax.axis("equal")
+
+        st.pyplot(fig)
+
+
+    # Data table
+    st.table(data)
+
+    st.markdown("""---""")
+
+
+def voters_location(data: DataFrame):
+    st.header("Location Of Voters")
+
+    st.radio("Sort Data", ["Yes", "No"], horizontal=True, index=1)
+
+
+
 def side_panel():
     refresh_interval = st.sidebar.slider("Refresh interval (seconds)", 5, 60, 10)
     st_autorefresh(refresh_interval * 1000, key='side_panel')
 
+    if st.sidebar.button("Refresh Data"):
+        st.cache_data.clear()
+        st.rerun()
+
+def get_data_from_csv(path, col_name, key):
+    df = pd.read_csv(path, header=None, names=col_name)
+    df = df.iloc[df.groupby(key)["total_votes"].idxmax()]
+    df.reset_index(drop=True, inplace=True)
+
+    return df
+
 
 if __name__ == "__main__":
+    # Prepare data
+    topics = ["votes_per_candidate", "turnout_per_location"]
+    for topic in topics:
+        fetch_data_from_kafka(topic)
+
+    votes_per_candidate_df = get_data_from_csv('./data/votes_per_candidate.csv', [
+        "candidate_id", "candidate_name", "party_affiliation", "photo_url", "total_votes"
+    ], "candidate_id")
+
+    turnout_per_location_df = get_data_from_csv('./data/turnout_per_location.csv', [
+        "state", "total_votes"
+    ], "state")
+
+
+    # Last refresh time
     st.title("Realtime Election Voting Dashboard")
     last_refresh_time()
 
@@ -116,8 +177,13 @@ if __name__ == "__main__":
     total_metric(voter_count, candidate_count)
 
     # Display leading candidate
-    show_leading_candidate()
+    leading_candidate(votes_per_candidate_df)
 
+    # Display voting statistics
+    voting_statistics(votes_per_candidate_df)
+
+    # Display location of voters
+    voters_location(turnout_per_location_df)
 
 
     # Side panel for auto refresh
