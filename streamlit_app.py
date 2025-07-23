@@ -133,8 +133,39 @@ def voting_statistics(data: DataFrame):
 def voters_location(data: DataFrame):
     st.header("Location Of Voters")
 
-    st.radio("Sort Data", ["Yes", "No"], horizontal=True, index=1)
+    top_menu = st.columns(3)
+    with top_menu[0]:
+        is_sort = st.radio("Sort Data", options=["Yes", "No"], horizontal=True, index=1)
+        if is_sort == "Yes":
+            sort_field = "state"
+            direction = "⬆️"
 
+            with top_menu[1]:
+                sort_field = st.selectbox("Sort By", options=["state", "total_votes"])
+            with top_menu[2]:
+                direction = st.radio("Direction", options=["⬆️", "⬇️"], horizontal=True, index=0)
+
+            data.sort_values(by=sort_field, ascending=(True if direction == "⬆️" else False), inplace=True)
+
+    data.index = range(1, data.shape[0] + 1)
+
+    data_container = st.container()
+
+    bottom_menu = st.columns((4, 1, 1))
+    total_pages = 0
+    current_page = 1
+    with bottom_menu[2]:
+        page_size = st.selectbox("Page Size", options=[10, 25, 50, 100])
+        total_pages = int((data.shape[0] - 1) / page_size) + 1
+
+    with bottom_menu[1]:
+        current_page = st.number_input("Page", min_value=1, max_value=total_pages, value=1, step=1)
+
+    with bottom_menu[0]:
+        st.markdown(f'Page **{current_page}** of **{total_pages}**')
+
+    frames = [data.iloc[i:i+page_size, :] for i in range(0, data.shape[0], page_size)]
+    data_container.dataframe(frames[current_page - 1], use_container_width=True)
 
 
 def side_panel():
@@ -185,10 +216,8 @@ if __name__ == "__main__":
     # Display location of voters
     voters_location(turnout_per_location_df)
 
-
     # Side panel for auto refresh
     side_panel()
-
 
 
     consumer.close()
