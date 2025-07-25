@@ -1,6 +1,10 @@
 .idea/
 .venv/
-checkpoint/
-checkpoint/turnout_per_location/
-checkpoint/votes_per_candidate/
-data/*
+
+checkpoint/turnout_per_location/*
+!checkpoint/turnout_per_location/.gitkeep
+
+checkpoint/votes_per_candidate/*
+!checkpoint/votes_per_candidate/.gitkeep
+
+data/*.csv
